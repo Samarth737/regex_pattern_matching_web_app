@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Regex Transformer API
+  version: 1.0.0
+  description: >
+    API for uploading CSV/Excel files, applying regex-based transformations
+    inferred from natural language prompts (via LLM), and returning the processed file.
+
+servers:
+  - url: http://localhost:8000/api
+
+paths:
+  /getResults/:
+    post:
+      summary: Upload a file and transform text using regex inferred by LLM
+      description: |
+        Accepts a CSV or Excel file and a natural language prompt.  
+        The backend calls the LLM twice:
+        1. To identify target column(s) from the prompt and schema.  
+        2. To infer a regex pattern + replacement using sample values from those columns.  
+
+        The full file is transformed and returned in the same format (CSV/Excel).  
+        Regex metadata and match statistics are included in custom response headers.
+      operationId: getResults
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - prompt
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or Excel file to process
+                prompt:
+                  type: string
+                  description: Natural language description of the transformation
+      responses:
+        "200":
+          description: Transformed file returned successfully
+          headers:
+            X-Regex-Info:
+              description: JSON string with regex metadata (target columns, pattern, flags, replacement, rationale)
+              schema:
+                type: string
+                example: |
+                  {
+                    "target_columns": ["Email"],
+                    "by_column": {
+                      "Email": {
+                        "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,7}\\b",
+                        "flags": "i",
+                        "replacement": "REDACTED",
+                        "rationale": "Standard email regex"
+                      }
+                    },
+                    "call_a": {
+                      "target_columns": ["Email"],
+                      "confidence": 0.92,
+                      "rationale": "Prompt explicitly mentioned 'email'"
+                    }
+                  }
+            X-Match-Stats:
+              description: JSON string with counts of matches per column
+              schema:
+                type: string
+                example: '{"Email": 3}'
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+                description: Processed CSV file
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+                description: Processed Excel file
+        "400":
+          description: Invalid input or parsing error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: No file uploaded
