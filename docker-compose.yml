@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: ./regex_transformer_django
+    env_file:
+      - ./regex_transformer_django/.env
+    environment:
+      - DJANGO_ALLOWED_HOSTS=backend,localhost,127.0.0.1
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./regex-transformer-react
+      args:
+        - REACT_APP_API_BASE=${REACT_APP_API_BASE:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
